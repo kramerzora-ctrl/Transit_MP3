@@ -1,0 +1,107 @@
+from helpers import clean_df_from_schedule, create_bus_task_lists, make_deadhead_calculator 
+from data_structures import BusTask, BusRun, DriverTask, DriverJob
+
+#1 Bus Task Fesibility Check
+##. Original
+#Extend the starter version. A task is feasible if the bus can reach its origin in time for the scheduled departure.
+def bus_task_feasibility_check(bus_run, bus_task):
+    latest_task = bus_run.get_latest_task()
+    if bus_run.is_empty():
+        return True
+    elif (latest_task.get_end_time() <= bus_task.get_start_time()) and (latest_task.get_destination() == bus_task.get_origin()):
+        return True 
+    else:
+        return False
+##. Extended
+
+def bus_task_feasibility_check(bus_run, bus_task):
+    latest_task = bus_run.get_latest_task()
+    if bus_run.is_empty():
+        return True
+    elif (latest_task.get_end_time() <= bus_task.get_start_time()) and \
+        (latest_task.get_destination() == bus_task.get_origin()):
+        return True 
+    elif (
+        latest_task.get_end_time() <= bus_task.get_start_time()) and \
+        (deadhead_time(latest_task.get_destination(),bus_task.get_origin()) <= \
+         (bus_task.get_start_time()-latest_task.get_end_time())):
+        return True
+    else:
+        return False
+    
+    #2 Bus Deadhead Feasibility Check
+##Returns “True” if the next task starts at a different location than where the last task ended, meaning a deadhead leg is needed.
+def bus_deadhead_feasibility_check(bus_run, bus_task):
+    latest_task = bus_run.get_latest_task()
+    if (
+        (latest_task.get_end_time() <= bus_task.get_start_time()) and \
+        (deadhead_time(latest_task.get_destination(),bus_task.get_origin()) <= \
+         (bus_task.get_start_time())-latest_task.get_end_time()) and \
+        (latest_task.get_destination() != bus_task.get_origin())
+    ):
+        return True
+    else:
+        return False
+    
+#3 Add deadhead task
+def add_deadhead(bus_run, bus_task):
+    latest_task = bus_run.get_latest_task()
+    
+    origin = latest_task.get_destination()
+    destination = bus_task.get_origin()
+    
+    start_time = latest_task.get_end_time()
+
+    travel_time = deadhead_time(origin, destination)
+    end_time = start_time + travel_time
+    
+
+    return BusTask(
+        origin=origin,
+        destination=destination,
+        start_time=start_time,
+        end_time=end_time,
+        task_duration=travel_time,
+        task_direction='deadhead' 
+    )
+    
+    #Plot Gantt 
+    import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+
+def plot_bus_gantt(bus_runs):
+    fig, ax = plt.subplots(figsize=(14, 7))
+    
+    # Colors matching your requirements
+    colors = {
+        'NB': '#3478db',       
+        'SB': '#e74c3c',       
+        'deadhead': "#010307"  
+    }
+    
+    for i, bus_run in enumerate(bus_runs):
+        for task in bus_run.get_task_list():
+            start = task.get_start_time()
+            duration = task.get_task_duration()
+            
+            # Use the direction for color, default to deadhead
+            d = task.task_direction
+            color = colors.get(d, colors['deadhead'])
+            
+            # Plot the bar: (start_x, width), (start_y, height)
+            ax.broken_barh([(start, duration)], (i - 0.4, 0.8), 
+                           facecolors=color, edgecolor='black', linewidth=0.5)
+
+    # Formatting
+    ax.set_yticks(range(len(bus_runs)))
+    ax.set_yticklabels([f'Bus {i+1}' for i in range(len(bus_runs))])
+    ax.set_xlabel('Time (Minutes from Midnight)')
+    ax.set_title('Bus Run Schedule Gantt Chart')
+    
+    # Legend
+    legend_elements = [Patch(facecolor=colors[k], label=k) for k in colors]
+    ax.legend(handles=legend_elements, title="Task Type")
+    
+    plt.grid(axis='x', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
