@@ -27,16 +27,19 @@ def i_o(df, input_col='Input', output_col='Output', title = None, in_label='Inpu
     max_q = results['Queue'].max()
     max_time = results.loc[results['Queue'].idxmax(), 'Time']
     
-    peak_times = results[results['Queue'] == max_q]['Time']
+    peak_indices = results[results['Queue'] == max_q].index
     
-    peak_start = peak_times.min()
-    peak_end = peak_times.max()
+    # Start is the first time it hits max
+    peak_start = results.loc[peak_indices.min(), 'Time']
     
-    if peak_start == peak_end:
-        peak_display_end = peak_start + pd.Timedelta(minutes=5)
+    # End is the timestamp of the NEXT event (when the queue drops)
+    # We take the last index of the peak and look one row ahead
+    last_peak_idx = peak_indices.max()
+    if last_peak_idx + 1 < len(results):
+        peak_end = results.loc[last_peak_idx + 1, 'Time']
     else:
-        peak_display_end = peak_end
-
+        peak_end = results.loc[last_peak_idx, 'Time']
+    
     peak_info = {
         'start': peak_start,
         'end': peak_end,
